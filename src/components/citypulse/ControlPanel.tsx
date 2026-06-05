@@ -1,48 +1,85 @@
+import React, { useState } from "react";
 import { AlertTriangle, Radio, Moon, Sun } from "lucide-react";
+import EscalationPanel from "../EscalationPanel";
+import AftershockPanel from "../AftershockPanel";
+import TripleThreatPanel from "../TripleThreatPanel";
+import GoldenHourClock from "../GoldenHourClock";
+import { CascadingHazardsPanel } from "../CascadingHazards";
 
 type Theme = "dark" | "light";
 
 interface ControlPanelProps {
   theme: Theme;
   onThemeChange: (t: Theme) => void;
+  eventTimestamp?: number;
 }
 
-const districts = [
-  { name: "Downtown District", value: 34, tone: "critical" as const },
-  { name: "Marina District", value: 81, tone: "warning" as const },
-  { name: "Industrial Sector", value: 96, tone: "safe" as const },
-];
 
-const toneClass = {
-  critical: "text-critical",
-  warning: "text-warning",
-  safe: "text-safe",
-};
 
-export function ControlPanel({ theme, onThemeChange }: ControlPanelProps) {
+export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPanelProps) {
+  const [showCascade, setShowCascade] = useState(false);
+
+  function CompactCard({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="p-2 rounded-md border bg-slate-950/50 border-slate-800 text-slate-100 text-sm">
+        {children}
+      </div>
+    );
+  }
+  const hazards = [
+    { id: 'h1', timeOffset: 'T-0m', title: 'Seismic Shockwave', description: 'Initial tremor impact recorded.', type: 'seismic', status: 'critical', probability: 100, lat: 42, lng: 48 },
+    { id: 'h2', timeOffset: '+12m', title: 'Substation Alpha Failure', description: 'Structural compromise of power towers.', type: 'power', status: 'predicted', probability: 95, lat: 35, lng: 60 },
+    { id: 'h3', timeOffset: '+25m', title: 'Water Pump Station B Overload', description: 'Pressure loss expected.', type: 'water', status: 'predicted', probability: 92, lat: 65, lng: 35 },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="border-b border-border px-5 py-4">
+      <div className="border-b border-border px-4 py-3">
         <div className="flex items-center gap-2 text-[10px] tracking-[0.2em] text-muted-foreground">
           <Radio className="h-3 w-3" />
           <span>SYSTEM ID // CP-04-EQ</span>
         </div>
-        <h1 className="mt-2 text-[15px] font-semibold uppercase leading-tight tracking-[0.14em]">
-          CityPulse <span className="text-muted-foreground">//</span> Post-Earthquake Command
-        </h1>
+        <div className="mt-2 flex items-center justify-between">
+          <h1 className="text-[15px] font-semibold uppercase leading-tight tracking-[0.14em]">
+            CityPulse <span className="text-muted-foreground">//</span> Post-Earthquake Command
+          </h1>
+          <div className="ml-4">
+            <GoldenHourClock compact eventTimestamp={eventTimestamp ?? Date.now() - 1000 * 60 * 20} />
+          </div>
+        </div>
         <div className="mt-3 flex items-center gap-2">
           <span className="relative inline-flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full rounded-full bg-safe animate-pulse-dot" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-safe" />
           </span>
           <span className="text-[10px] uppercase tracking-[0.2em] text-safe">Live Data Feed</span>
-          <span className="ml-auto text-[10px] tracking-widest text-muted-foreground">14:02:47 UTC</span>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="text-[10px] tracking-widest text-muted-foreground">14:02:47 UTC</div>
+            <div className="flex items-center gap-1">
+              <button
+                aria-label="Set dark mode"
+                title="Dark"
+                onClick={() => onThemeChange('dark')}
+                className={`p-1 rounded-md transition-colors ${theme === 'dark' ? 'bg-cyan-route/15 border border-cyan-route text-cyan-route' : 'text-muted-foreground hover:bg-mask/30'}`}
+              >
+                <Moon className="h-4 w-4" />
+              </button>
+              <button
+                aria-label="Set light mode"
+                title="Light"
+                onClick={() => onThemeChange('light')}
+                className={`p-1 rounded-md transition-colors ${theme === 'light' ? 'bg-cyan-route/15 border border-cyan-route text-cyan-route' : 'text-muted-foreground hover:bg-mask/30'}`}
+              >
+                <Sun className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Critical Alert */}
-      <div className="px-5 pt-5">
+      <div className="px-4 pt-4">
         <div
           className="relative overflow-hidden rounded-sm border border-critical bg-critical/10 px-4 py-3 animate-critical"
         >
@@ -61,57 +98,44 @@ export function ControlPanel({ theme, onThemeChange }: ControlPanelProps) {
         </div>
       </div>
 
-      {/* City Health */}
-      <div className="px-5 pt-6">
-        <SectionLabel>City Health Index</SectionLabel>
-        <div className="mt-3 space-y-2">
-          {districts.map((d) => (
-            <div
-              key={d.name}
-              className="flex items-center justify-between rounded-sm border border-border bg-mask/60 px-3 py-2.5"
-            >
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  {d.name}
-                </div>
-                <div className={`mt-0.5 text-[18px] font-bold tracking-tight ${toneClass[d.tone]}`}>
-                  {d.value}% <span className="text-[10px] font-normal tracking-widest opacity-70">OPERATIONAL</span>
-                </div>
-              </div>
-              <div className="h-10 w-16">
-                <Sparkline tone={d.tone} value={d.value} />
-              </div>
+      {/* New Hazard Panels (compact) */}
+      <div className="px-4 pt-5 space-y-3 overflow-y-auto">
+        <CompactCard>
+          <EscalationPanel timeline={[{ id: 't1', probability: 100, timeOffset: 'T-0' }, { id: 't2', probability: 95, timeOffset: '+12m' }, { id: 't3', probability: 92, timeOffset: '+25m' }]} />
+        </CompactCard>
+
+        <CompactCard>
+          <AftershockPanel center={{ lat: 42, lng: 48 }} />
+        </CompactCard>
+
+        <CompactCard>
+          <TripleThreatPanel incident={{ lat: 42, lng: 48, debrisRadiusKm: 2 }} heatmapCells={[{x:1,y:1},{x:2,y:2},{x:3,y:3},{x:4,y:4},{x:5,y:5}]} blockedRoutes={[{id:'r1'}]} />
+        </CompactCard>
+
+        <div className="pt-1">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] uppercase text-slate-300">Cascading Hazards</div>
+            <button onClick={() => setShowCascade((s) => !s)} className="text-xs text-slate-400 underline">
+              {showCascade ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {showCascade ? (
+            <div className="mt-2">
+              <CascadingHazardsPanel hazards={hazards} onSelectEvent={() => {}} activeId={null} />
             </div>
-          ))}
+          ) : (
+            <div className="mt-2 text-[12px] text-slate-300">
+              {hazards.slice(0, 3).map((h) => (
+                <div key={h.id} className="py-1">• {h.title}</div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Map Mode Toggle */}
-      <div className="px-5 pt-6">
-        <SectionLabel>Map Display Mode</SectionLabel>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onThemeChange("dark")}
-            className={`flex items-center justify-center gap-2 rounded-sm border px-3 py-2.5 text-[11px] uppercase tracking-[0.18em] transition-colors ${
-              theme === "dark"
-                ? "border-cyan-route bg-cyan-route/15 text-cyan-route"
-                : "border-border bg-mask/40 text-muted-foreground hover:border-cyan-route/40"
-            }`}
-          >
-            <Moon className="h-3.5 w-3.5" /> Dark
-          </button>
-          <button
-            onClick={() => onThemeChange("light")}
-            className={`flex items-center justify-center gap-2 rounded-sm border px-3 py-2.5 text-[11px] uppercase tracking-[0.18em] transition-colors ${
-              theme === "light"
-                ? "border-cyan-route bg-cyan-route/15 text-cyan-route"
-                : "border-border bg-mask/40 text-muted-foreground hover:border-cyan-route/40"
-            }`}
-          >
-            <Sun className="h-3.5 w-3.5" /> Light
-          </button>
-        </div>
-      </div>
+      
+
+      {/* Map Mode Toggle removed (compact controls moved to header) */}
 
       {/* Footer telemetry */}
       <div className="mt-auto border-t border-border px-5 py-3">
@@ -147,26 +171,3 @@ function Telemetry({ label, value, tone }: { label: string; value: string; tone:
   );
 }
 
-function Sparkline({ tone, value }: { tone: "safe" | "warning" | "critical"; value: number }) {
-  const stroke =
-    tone === "safe" ? "var(--safe)" : tone === "warning" ? "var(--warning)" : "var(--critical)";
-  // deterministic-ish points based on value
-  const points = Array.from({ length: 12 }, (_, i) => {
-    const base = value / 100;
-    const jitter = Math.sin(i * 1.3 + value) * 0.18;
-    const y = 30 - Math.max(2, Math.min(28, (base + jitter) * 30));
-    return `${i * 6},${y.toFixed(1)}`;
-  }).join(" ");
-  return (
-    <svg viewBox="0 0 66 30" className="h-full w-full">
-      <polyline
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.25"
-        points={points}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}

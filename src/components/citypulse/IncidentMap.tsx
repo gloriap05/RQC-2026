@@ -21,17 +21,9 @@ const GEOFENCE_COORDS: [number, number][] = [
   [37.7846, -122.412],
 ];
 
-// Origin & destination for the road-snapped reroute (lng,lat for OSRM)
 const ORIGIN_POINT: [number, number] = [37.782, -122.416];
-const DEST_POINT: [number, number] = [37.7849, -122.4094]; // Leads directly to ACTIVE_CENTER
+const DEST_POINT: [number, number] = [37.7849, -122.4094];
 const BLOCKAGE_POINT: [number, number] = [37.7836, -122.413];
-
-const TILT_BUILDING: [number, number][] = [
-  [37.7854, -122.4088],
-  [37.7854, -122.4082],
-  [37.785, -122.4082],
-  [37.785, -122.4088],
-];
 
 const CIVILIAN_HEAT = Array.from({ length: 60 }).map(() => {
   const radius = Math.random() * 0.0012;
@@ -99,7 +91,6 @@ export function IncidentMap({ theme }: IncidentMapProps) {
     });
   };
 
-  // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -147,7 +138,6 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         }).addTo(map);
       });
 
-      // Fetch road-snapped route from OSRM (public demo server)
       let routeCoords: [number, number][] = [
         [ORIGIN_POINT[0], ORIGIN_POINT[1]],
         [DEST_POINT[0], DEST_POINT[1]],
@@ -161,7 +151,7 @@ export function IncidentMap({ theme }: IncidentMapProps) {
           routeCoords = coords.map((c: [number, number]) => [c[1], c[0]]);
         }
       } catch {
-        // fall back to straight line
+        // Fallback representation
       }
       if (cancelled || !mapRef.current) return;
 
@@ -218,20 +208,6 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         })
         .addTo(map);
 
-      L.polygon(TILT_BUILDING, {
-        color: "#f59e0b",
-        weight: 2,
-        fillColor: "#f59e0b",
-        fillOpacity: 0.38,
-      })
-        .bindTooltip("OSM 3D Comparison Flag: Tilt Delta Detected: 2.4° (Pre-Collapse Warning)", {
-          permanent: true,
-          direction: "top",
-          offset: [0, -8],
-          className: "citypulse-tooltip citypulse-tooltip--warning",
-        })
-        .addTo(map);
-
       GLOBAL_HOTSPOTS.forEach((hotspot) => {
         const color = SEVERITY_COLOR[hotspot.severity];
         const openHotspot = () => focusHotspot(hotspot);
@@ -274,10 +250,8 @@ export function IncidentMap({ theme }: IncidentMapProps) {
       rerouteRef.current = null;
       rerouteGlowRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Swap tile layer when theme changes
   useEffect(() => {
     const map = mapRef.current;
     const tile = tileLayerRef.current;
@@ -288,13 +262,11 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         maxZoom: 19,
         subdomains: "abcd",
       }).addTo(map);
-      // keep tile layer behind overlays
       tileLayerRef.current.bringToBack();
     });
   }, [theme]);
 
   const flyHome = () => focusHotspot(GLOBAL_HOTSPOTS[0]);
-
   const flyWorld = () => {
     mapRef.current?.flyTo(WORLD_CENTER, 2, { animate: true, duration: 1.35 });
   };
@@ -303,14 +275,18 @@ export function IncidentMap({ theme }: IncidentMapProps) {
 
   return (
     <div className={`relative h-full w-full overflow-hidden ${isDark ? "bg-[#0d1018]" : "bg-[#e8eef5]"}`}>
-      <div ref={containerRef} className="absolute inset-0" />
-      {/* Dimming overlay only in dark mode */}
+      {/* Background layer: Leaflet map container */}
+      <div ref={containerRef} className="absolute inset-0 z-0" />
+      
+      {/* Dimming overlay layer */}
       {isDark && (
-        <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/35 mix-blend-multiply" />
+        <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/35 mix-blend-multiply z-10" />
       )}
 
+      {/* TOP HUD AND BOTTOM BAR PANEL LAYER */}
       <HudOverlay selected={selected} theme={theme} />
 
+      {/* RIGHT SIDEBAR: GLOBAL CRITICAL INDEX LIST PANEL */}
       <HotspotList
         selected={selected}
         onSelect={(hotspot) => {
@@ -318,7 +294,8 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         }}
       />
 
-      <div className="pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-route/30 bg-mask/70 backdrop-blur-sm">
+      {/* CENTER SECTOR & WORLD CONFIGURATION TOGGLES CONTAINER */}
+      <div className="pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-route/30 bg-mask/70 backdrop-blur-sm z-40">
         <button
           onClick={flyHome}
           className="px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] text-cyan-route hover:bg-cyan-route/10"
@@ -334,7 +311,8 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         </button>
       </div>
 
-      <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.05]">
+      {/* AMBIENT DECORATIVE LAYER */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.05] z-10">
         <div
           className="absolute left-0 right-0 h-24 animate-scan"
           style={{ background: "linear-gradient(to bottom, transparent, var(--cyan-route), transparent)" }}
@@ -352,7 +330,8 @@ function HotspotList({
   onSelect: (h: Hotspot) => void;
 }) {
   return (
-    <div className="pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-route/30 bg-mask/80 backdrop-blur-sm">
+    /* FIXED: Changed to z-40 to pop over the map container and allow direct click events */
+    <div className="pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-route/30 bg-mask/80 backdrop-blur-sm z-40">
       <div className="flex items-center justify-between border-b border-cyan-route/30 px-3 py-2">
         <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-route">◢ Global Critical Index</span>
         <span className="text-[9px] text-muted-foreground">{GLOBAL_HOTSPOTS.length}</span>
@@ -391,13 +370,13 @@ function HotspotList({
   );
 }
 
-// Fixed Bracket Syntax Here:
 function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dark" | "light" }) {
   return (
     <>
-      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm">
+      {/* FIXED: Changed to z-40 to push top dashboard indicators on top of map element */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm z-40">
         <div className="flex items-center gap-4 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          <span className="flex items-center gap-2 text-cyan-route">
+          <span className="pointer-events-auto flex items-center gap-2 text-cyan-route">
             <Crosshair className="h-3 w-3" />
             {selected ? selected.name : "Active Zone"}
           </span>
@@ -423,10 +402,11 @@ function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dar
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm">
+      {/* FIXED: Changed to z-40 to stack the bottom control menu correctly */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm z-40">
         <div className="flex items-center gap-5 text-[10px] uppercase tracking-[0.22em]">
           <LegendDot color="#ef4444" label="Critical" />
-          <LegendDot color="#f59e0b" label="Warning / Tilt" />
+          <LegendDot color="#f59e0b" label="Warning" />
           <LegendDot color="#22d3ee" label="Reroute / Watch" />
           <LegendDot color="#f97316" label="Blockage" />
         </div>

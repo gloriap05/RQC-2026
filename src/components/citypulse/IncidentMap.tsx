@@ -1,9 +1,10 @@
 import { Crosshair, Maximize2, Layers, Compass } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { LatLngExpression, Map as LeafletMap } from "leaflet";
+import type { LatLngExpression, Map as LeafletMap, TileLayer as LeafletTileLayer, Polyline as LeafletPolyline } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TILE_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const TILE_LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 const ACTIVE_CENTER: [number, number] = [-122.4094, 37.7849];
 const ACTIVE_LATLNG: LatLngExpression = [ACTIVE_CENTER[1], ACTIVE_CENTER[0]];
 const WORLD_CENTER: LatLngExpression = [25, 10];
@@ -20,23 +21,11 @@ const GEOFENCE_COORDS: [number, number][] = [
   [37.7846, -122.412],
 ];
 
-const REROUTE_LINE: [number, number][] = [
-  [37.782, -122.416],
-  [37.7822, -122.414],
-  [37.7836, -122.4128],
-  [37.7842, -122.4115],
-  [37.7848, -122.4102],
-];
-
-const BLOCKED_LINE: [number, number][] = [
-  [37.782, -122.416],
-  [37.782, -122.4135],
-  [37.7842, -122.413],
-  [37.7848, -122.411],
-];
-
-const BLOCKAGE_POINT: [number, number] = [37.7836, -122.413];
+// Origin & destination for the road-snapped reroute (lng,lat for OSRM)
 const ORIGIN_POINT: [number, number] = [37.782, -122.416];
+const DEST_POINT: [number, number] = [37.7849, -122.4094]; // Leads directly to ACTIVE_CENTER
+const BLOCKAGE_POINT: [number, number] = [37.7836, -122.413];
+
 const TILT_BUILDING: [number, number][] = [
   [37.7854, -122.4088],
   [37.7854, -122.4082],
@@ -90,9 +79,16 @@ function hotspotZoom(hotspot: Hotspot) {
   return 5;
 }
 
-export function IncidentMap() {
+interface IncidentMapProps {
+  theme: "dark" | "light";
+}
+
+export function IncidentMap({ theme }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
+  const rerouteRef = useRef<LeafletPolyline | null>(null);
+  const rerouteGlowRef = useRef<LeafletPolyline | null>(null);
   const [selected, setSelected] = useState<Hotspot | null>(GLOBAL_HOTSPOTS[0]);
 
   const focusHotspot = (hotspot: Hotspot) => {
@@ -103,6 +99,7 @@ export function IncidentMap() {
     });
   };
 
+  // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -110,7 +107,7 @@ export function IncidentMap() {
     let dashStep = 0;
     let dashTimer: number | null = null;
 
-    void import("leaflet").then((L) => {
+    void import("leaflet").then(async (L) => {
       if (cancelled || !containerRef.current) return;
 
       const map = L.map(containerRef.current, {
@@ -125,11 +122,12 @@ export function IncidentMap() {
       L.control.zoom({ position: "topright" }).addTo(map);
       L.control
         .attribution({ position: "bottomleft", prefix: false })
-        .addAttribution("CARTO · OpenStreetMap")
+        .addAttribution("CARTO · OpenStreetMap · OSRM")
         .addTo(map);
 
-      L.tileLayer(TILE_URL, {
+      tileLayerRef.current = L.tileLayer(theme === "dark" ? TILE_DARK : TILE_LIGHT, {
         maxZoom: 19,
+        subdomains: "abcd",
       }).addTo(map);
 
       L.polygon(GEOFENCE_COORDS, {
@@ -149,33 +147,47 @@ export function IncidentMap() {
         }).addTo(map);
       });
 
-      L.polyline(BLOCKED_LINE, {
-        color: "#67e8f9",
-        weight: 2,
-        opacity: 0.25,
-        dashArray: "5 10",
-      }).addTo(map);
+      // Fetch road-snapped route from OSRM (public demo server)
+      let routeCoords: [number, number][] = [
+        [ORIGIN_POINT[0], ORIGIN_POINT[1]],
+        [DEST_POINT[0], DEST_POINT[1]],
+      ];
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${ORIGIN_POINT[1]},${ORIGIN_POINT[0]};${DEST_POINT[1]},${DEST_POINT[0]}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const json = await res.json();
+        const coords = json?.routes?.[0]?.geometry?.coordinates;
+        if (Array.isArray(coords) && coords.length) {
+          routeCoords = coords.map((c: [number, number]) => [c[1], c[0]]);
+        }
+      } catch {
+        // fall back to straight line
+      }
+      if (cancelled || !mapRef.current) return;
 
-      L.polyline(REROUTE_LINE, {
+      rerouteGlowRef.current = L.polyline(routeCoords, {
         color: "#67e8f9",
         weight: 10,
-        opacity: 0.18,
+        opacity: 0.22,
+        lineCap: "round",
+        lineJoin: "round",
       }).addTo(map);
 
-      const rerouteLine = L.polyline(REROUTE_LINE, {
+      rerouteRef.current = L.polyline(routeCoords, {
         color: "#67e8f9",
-        weight: 3,
-        opacity: 0.95,
-        dashArray: "12 12",
+        weight: 4,
+        opacity: 0.98,
+        dashArray: "10 10",
         lineCap: "round",
+        lineJoin: "round",
       }).addTo(map);
 
       dashTimer = window.setInterval(() => {
-        dashStep = (dashStep + 1) % 24;
-        rerouteLine.setStyle({ dashOffset: `${dashStep}` });
+        dashStep = (dashStep + 1) % 20;
+        rerouteRef.current?.setStyle({ dashOffset: `${dashStep}` });
       }, 100);
 
-      L.circleMarker(ORIGIN_POINT, {
+      L.circleMarker([ORIGIN_POINT[0], ORIGIN_POINT[1]], {
         radius: 6,
         color: "#ffffff",
         weight: 1.5,
@@ -258,8 +270,28 @@ export function IncidentMap() {
       }
       mapRef.current?.remove();
       mapRef.current = null;
+      tileLayerRef.current = null;
+      rerouteRef.current = null;
+      rerouteGlowRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Swap tile layer when theme changes
+  useEffect(() => {
+    const map = mapRef.current;
+    const tile = tileLayerRef.current;
+    if (!map || !tile) return;
+    void import("leaflet").then((L) => {
+      map.removeLayer(tile);
+      tileLayerRef.current = L.tileLayer(theme === "dark" ? TILE_DARK : TILE_LIGHT, {
+        maxZoom: 19,
+        subdomains: "abcd",
+      }).addTo(map);
+      // keep tile layer behind overlays
+      tileLayerRef.current.bringToBack();
+    });
+  }, [theme]);
 
   const flyHome = () => focusHotspot(GLOBAL_HOTSPOTS[0]);
 
@@ -267,12 +299,17 @@ export function IncidentMap() {
     mapRef.current?.flyTo(WORLD_CENTER, 2, { animate: true, duration: 1.35 });
   };
 
-  return (
-    <div className="relative h-full w-full overflow-hidden bg-[#0d1018]">
-      <div ref={containerRef} className="absolute inset-0" />
-      <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/12 mix-blend-multiply" />
+  const isDark = theme === "dark";
 
-      <HudOverlay selected={selected} />
+  return (
+    <div className={`relative h-full w-full overflow-hidden ${isDark ? "bg-[#0d1018]" : "bg-[#e8eef5]"}`}>
+      <div ref={containerRef} className="absolute inset-0" />
+      {/* Dimming overlay only in dark mode */}
+      {isDark && (
+        <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/35 mix-blend-multiply" />
+      )}
+
+      <HudOverlay selected={selected} theme={theme} />
 
       <HotspotList
         selected={selected}
@@ -354,7 +391,8 @@ function HotspotList({
   );
 }
 
-function HudOverlay({ selected }: { selected: Hotspot | null }) {
+// Fixed Bracket Syntax Here:
+function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dark" | "light" }) {
   return (
     <>
       <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm">
@@ -374,10 +412,10 @@ function HudOverlay({ selected }: { selected: Hotspot | null }) {
         </div>
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <Layers className="h-3 w-3" /> Leaflet Tiles
+            <Layers className="h-3 w-3" /> {theme === "dark" ? "Dark" : "Light"} Tiles
           </span>
           <span className="flex items-center gap-1.5">
-            <Compass className="h-3 w-3" /> Tactical Overlay
+            <Compass className="h-3 w-3" /> OSRM Routed
           </span>
           <span className="flex items-center gap-1.5">
             <Maximize2 className="h-3 w-3" /> Worldwide
@@ -392,7 +430,9 @@ function HudOverlay({ selected }: { selected: Hotspot | null }) {
           <LegendDot color="#22d3ee" label="Reroute / Watch" />
           <LegendDot color="#f97316" label="Blockage" />
         </div>
-        <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Tiles: CARTO Dark · Raster · OSM v2026.05</div>
+        <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          Tiles: CARTO {theme === "dark" ? "Dark" : "Positron"} · Route: OSRM
+        </div>
       </div>
     </>
   );

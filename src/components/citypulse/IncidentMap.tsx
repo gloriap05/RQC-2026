@@ -1,38 +1,39 @@
 import { AlertTriangle, Ambulance, BrainCircuit, Check, Compass, Crosshair, Flame, Layers, Maximize2, Send, ShieldAlert, Users, X } from "lucide-react";
-import { hazardConfig } from '@/lib/hazardConfig';
+import { hazardConfig } from "@/lib/hazardConfig";
 import { useEffect, useRef, useState } from "react";
-import type { LatLngExpression, Map as LeafletMap, TileLayer as LeafletTileLayer, Polyline as LeafletPolyline } from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl, { Map as MlMap, Marker, Popup } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
-const TILE_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-const TILE_LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
 const ACTIVE_CENTER: [number, number] = [-122.4094, 37.7849];
-const ACTIVE_LATLNG: LatLngExpression = [ACTIVE_CENTER[1], ACTIVE_CENTER[0]];
-const WORLD_CENTER: LatLngExpression = [25, 10];
+const WORLD_CENTER: [number, number] = [10, 25];
 
 const GEOFENCE_COORDS: [number, number][] = [
-  [37.7858, -122.4118],
-  [37.7866, -122.4108],
-  [37.7868, -122.409],
-  [37.786, -122.4078],
-  [37.7848, -122.4074],
-  [37.7838, -122.408],
-  [37.7832, -122.4094],
-  [37.7836, -122.411],
-  [37.7846, -122.412],
+  [-122.4118, 37.7858],
+  [-122.4108, 37.7866],
+  [-122.409, 37.7868],
+  [-122.4078, 37.786],
+  [-122.4074, 37.7848],
+  [-122.408, 37.7838],
+  [-122.4094, 37.7832],
+  [-122.411, 37.7836],
+  [-122.412, 37.7846],
+  [-122.4118, 37.7858],
 ];
 
-const ORIGIN_POINT: [number, number] = [37.782, -122.416];
-const DEST_POINT: [number, number] = [37.7849, -122.4094];
-const BLOCKAGE_POINT: [number, number] = [37.7836, -122.413];
+const ORIGIN_POINT: [number, number] = [-122.416, 37.782];
+const DEST_POINT: [number, number] = [-122.4094, 37.7849];
+const BLOCKAGE_POINT: [number, number] = [-122.413, 37.7836];
 
 const CIVILIAN_HEAT = Array.from({ length: 60 }).map(() => {
   const radius = Math.random() * 0.0012;
   const angle = Math.random() * Math.PI * 2;
   const weight = 0.5 + Math.random() * 0.5;
   return {
-    lat: ACTIVE_CENTER[1] + Math.sin(angle) * radius * 0.7,
     lng: ACTIVE_CENTER[0] + Math.cos(angle) * radius,
+    lat: ACTIVE_CENTER[1] + Math.sin(angle) * radius * 0.7,
     weight,
   };
 });
@@ -99,10 +100,10 @@ const RESPONSE_TEAMS = [
   { icon: Users, label: "Control", value: "Police perimeter crew", tone: "text-cyan-route" },
 ];
 
-function hotspotZoom(hotspot: Hotspot) {
-  if (hotspot.id === "sf") return 15;
-  if (hotspot.severity === "critical") return 8;
-  if (hotspot.severity === "warning") return 6;
+function hotspotZoom(h: Hotspot) {
+  if (h.id === "sf") return 15.5;
+  if (h.severity === "critical") return 8;
+  if (h.severity === "warning") return 6;
   return 5;
 }
 
@@ -112,337 +113,409 @@ interface IncidentMapProps {
 
 export function IncidentMap({ theme }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
-  const rerouteRef = useRef<LeafletPolyline | null>(null);
-  const rerouteGlowRef = useRef<LeafletPolyline | null>(null);
+  const mapRef = useRef<MlMap | null>(null);
+  const markersRef = useRef<Marker[]>([]);
   const [selected, setSelected] = useState<Hotspot | null>(GLOBAL_HOTSPOTS[0]);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   const focusHotspot = (hotspot: Hotspot) => {
     setSelected(hotspot);
-    mapRef.current?.flyTo([hotspot.lat, hotspot.lng], hotspotZoom(hotspot), {
-      animate: true,
-      duration: 1.2,
+    mapRef.current?.flyTo({
+      center: [hotspot.lng, hotspot.lat],
+      zoom: hotspotZoom(hotspot),
+      pitch: hotspot.id === "sf" ? 60 : 30,
+      bearing: hotspot.id === "sf" ? -20 : 0,
+      duration: 1400,
+      essential: true,
     });
   };
 
+  // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    let cancelled = false;
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: theme === "dark" ? STYLE_DARK : STYLE_LIGHT,
+      center: ACTIVE_CENTER,
+      zoom: 15.5,
+      pitch: 60,
+      bearing: -20,
+      attributionControl: false,
+    });
+
+    const ro = new ResizeObserver(() => map.resize());
+    ro.observe(containerRef.current);
+    requestAnimationFrame(() => map.resize());
+
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(
+      new maplibregl.AttributionControl({ compact: true, customAttribution: "CARTO · OpenStreetMap · OSRM" }),
+      "bottom-left",
+    );
+
     let dashStep = 0;
     let dashTimer: number | null = null;
+    let cancelled = false;
 
-    void import("leaflet").then(async (L) => {
-      if (cancelled || !containerRef.current) return;
+    const wireLayers = async () => {
+      // 3D buildings (Carto basemap source layer "building")
+      try {
+        const layers = map.getStyle().layers ?? [];
+        let labelLayerId: string | undefined;
+        for (const l of layers) {
+          if (l.type === "symbol") {
+            labelLayerId = l.id;
+            break;
+          }
+        }
+        if (map.getSource("carto")) {
+          map.addLayer(
+            {
+              id: "3d-buildings",
+              source: "carto",
+              "source-layer": "building",
+              type: "fill-extrusion",
+              minzoom: 14,
+              paint: {
+                "fill-extrusion-color": themeRef.current === "dark" ? "#1b2230" : "#cbd5e1",
+                "fill-extrusion-height": [
+                  "case",
+                  ["has", "render_height"],
+                  ["get", "render_height"],
+                  ["has", "height"],
+                  ["get", "height"],
+                  12,
+                ],
+                "fill-extrusion-base": 0,
+                "fill-extrusion-opacity": 0.85,
+              },
+            },
+            labelLayerId,
+          );
+        }
+      } catch {
+        // ignore
+      }
 
-      const map = L.map(containerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        preferCanvas: true,
-        worldCopyJump: true,
-      }).setView(ACTIVE_LATLNG, 15);
-
-      mapRef.current = map;
-
-      L.control.zoom({ position: "topright" }).addTo(map);
-      L.control
-        .attribution({ position: "bottomleft", prefix: false })
-        .addAttribution("CARTO · OpenStreetMap · OSRM")
-        .addTo(map);
-
-      tileLayerRef.current = L.tileLayer(theme === "dark" ? TILE_DARK : TILE_LIGHT, {
-        maxZoom: 19,
-        subdomains: "abcd",
-      }).addTo(map);
-
-      L.polygon(GEOFENCE_COORDS, {
-        color: "#ef4444",
-        weight: 2.5,
-        dashArray: "8 6",
-        fillColor: "#ef4444",
-        fillOpacity: 0.08,
-      }).addTo(map);
-
-      L.marker(DEST_POINT, {
-        zIndexOffset: 800,
-        icon: L.divIcon({
-          className: "citypulse-div-icon",
-          iconSize: [42, 42],
-          iconAnchor: [21, 39],
-          html: `
-            <div class="citypulse-hazard-marker" aria-label="Critical hazard">
-              <div class="citypulse-hazard-triangle">!</div>
-            </div>
-          `,
-        }),
-      })
-        .bindTooltip("HAZARD: COLLAPSE + UTILITY LEAK RISK", {
-          permanent: true,
-          direction: "top",
-          offset: [0, -34],
-          className: "citypulse-tooltip citypulse-tooltip--hazard",
-        })
-        .addTo(map);
-
-      CIVILIAN_HEAT.forEach((point) => {
-        L.circleMarker([point.lat, point.lng], {
-          radius: 10 + point.weight * 10,
-          stroke: false,
-          fillColor: point.weight > 0.72 ? "#ef4444" : "#f59e0b",
-          fillOpacity: 0.12 + point.weight * 0.18,
-        }).addTo(map);
+      // Geofence polygon
+      map.addSource("geofence", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Polygon", coordinates: [GEOFENCE_COORDS] },
+        },
+      });
+      map.addLayer({
+        id: "geofence-fill",
+        type: "fill",
+        source: "geofence",
+        paint: { "fill-color": "#ef4444", "fill-opacity": 0.08 },
+      });
+      map.addLayer({
+        id: "geofence-line",
+        type: "line",
+        source: "geofence",
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 2.5,
+          "line-dasharray": [2, 1.5],
+        },
       });
 
-      let routeCoords: [number, number][] = [
-        [ORIGIN_POINT[0], ORIGIN_POINT[1]],
-        [DEST_POINT[0], DEST_POINT[1]],
+      const hazardEl = document.createElement("div");
+      hazardEl.className = "citypulse-hazard-marker";
+      hazardEl.setAttribute("aria-label", "Critical hazard");
+      hazardEl.innerHTML = '<div class="citypulse-hazard-triangle">!</div>';
+      markersRef.current.push(
+        new maplibregl.Marker({ element: hazardEl, anchor: "bottom" })
+          .setLngLat(DEST_POINT)
+          .setPopup(
+            new Popup({ closeButton: false, offset: 24 }).setHTML(
+              tip("Hazard: collapse + utility leak risk", "#f59e0b"),
+            ),
+          )
+          .addTo(map),
+      );
+
+      // Geofence label (always visible)
+      const gfLngs = GEOFENCE_COORDS.map((c) => c[0]);
+      const gfLats = GEOFENCE_COORDS.map((c) => c[1]);
+      const gfCentroid: [number, number] = [
+        (Math.min(...gfLngs) + Math.max(...gfLngs)) / 2,
+        Math.max(...gfLats) + 0.0004,
       ];
+      const gfLabelEl = document.createElement("div");
+      gfLabelEl.style.cssText =
+        "font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#fff;background:rgba(127,29,29,0.92);border:1px solid #ef4444;padding:4px 8px;border-radius:2px;box-shadow:0 0 12px #ef444466;white-space:nowrap;pointer-events:none;";
+      gfLabelEl.textContent = "⚠ Red Zone · Restricted Perimeter";
+      markersRef.current.push(
+        new maplibregl.Marker({ element: gfLabelEl }).setLngLat(gfCentroid).addTo(map),
+      );
+
+      // Civilian heat
+      map.addSource("civilian-heat", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: CIVILIAN_HEAT.map((p) => ({
+            type: "Feature",
+            properties: { weight: p.weight },
+            geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+          })),
+        },
+      });
+      map.addLayer({
+        id: "civilian-heat-layer",
+        type: "heatmap",
+        source: "civilian-heat",
+        paint: {
+          "heatmap-weight": ["get", "weight"],
+          "heatmap-intensity": 1.2,
+          "heatmap-radius": 28,
+          "heatmap-opacity": 0.7,
+          "heatmap-color": [
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0, "rgba(6,182,212,0)",
+            0.3, "rgba(6,182,212,0.4)",
+            0.6, "rgba(245,158,11,0.6)",
+            1, "rgba(239,68,68,0.85)",
+          ],
+        },
+      });
+
+      // Reroute (initial straight, replaced by OSRM)
+      let routeCoords: [number, number][] = [ORIGIN_POINT, DEST_POINT];
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${ORIGIN_POINT[1]},${ORIGIN_POINT[0]};${DEST_POINT[1]},${DEST_POINT[0]}?overview=full&geometries=geojson`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${ORIGIN_POINT[0]},${ORIGIN_POINT[1]};${DEST_POINT[0]},${DEST_POINT[1]}?overview=full&geometries=geojson`;
         const res = await fetch(url);
         const json = await res.json();
         const coords = json?.routes?.[0]?.geometry?.coordinates;
         if (Array.isArray(coords) && coords.length) {
-          routeCoords = coords.map((c: [number, number]) => [c[1], c[0]]);
+          routeCoords = coords as [number, number][];
         }
       } catch {
-        // Fallback trace
+        // fallback
       }
       if (cancelled || !mapRef.current) return;
 
-      rerouteGlowRef.current = L.polyline(routeCoords, {
-        color: "#06b6d4",
-        weight: 10,
-        opacity: 0.22,
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(map);
-
-      rerouteRef.current = L.polyline(routeCoords, {
-        color: "#06b6d4",
-        weight: 4,
-        opacity: 0.98,
-        dashArray: "10 10",
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(map);
-
-      dashTimer = window.setInterval(() => {
-        dashStep = (dashStep + 1) % 20;
-        rerouteRef.current?.setStyle({ dashOffset: `${dashStep}` });
-      }, 100);
-
-      L.circleMarker([ORIGIN_POINT[0], ORIGIN_POINT[1]], {
-        radius: 6,
-        color: "#ffffff",
-        weight: 1.5,
-        fillColor: "#06b6d4",
-        fillOpacity: 1,
-      })
-        .bindTooltip("UNIT-07 ORIGIN", {
-          permanent: true,
-          direction: "top",
-          offset: [0, -10],
-          className: "citypulse-tooltip",
-        })
-        .addTo(map);
-
-      L.marker(BLOCKAGE_POINT, {
-        icon: L.divIcon({
-          className: "citypulse-div-icon",
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-          html: '<div style="display:flex;height:26px;width:26px;align-items:center;justify-content:center;color:#f97316;font-size:20px;font-weight:700;text-shadow:0 0 12px #f97316;">✕</div>',
-        }),
-      })
-        .bindTooltip("RE-ROUTE TRIGGER: SECONDARY BLOCKAGE", {
-          permanent: true,
-          direction: "top",
-          offset: [0, -12],
-          className: "citypulse-tooltip citypulse-tooltip--warning",
-        })
-        .addTo(map);
-
-      GLOBAL_HOTSPOTS.forEach((hotspot) => {
-        const color = SEVERITY_COLOR[hotspot.severity];
-        const openHotspot = () => focusHotspot(hotspot);
-
-        L.circleMarker([hotspot.lat, hotspot.lng], {
-          radius: 8 + hotspot.magnitude * 2.4,
-          stroke: false,
-          fillColor: color,
-          fillOpacity: 0.16,
-        })
-          .on("click", openHotspot)
-          .addTo(map);
-
-        L.circleMarker([hotspot.lat, hotspot.lng], {
-          radius: 3 + hotspot.magnitude * 0.45,
-          color: "#ffffff",
-          weight: 1,
-          fillColor: color,
-          fillOpacity: 1,
-        })
-          .bindTooltip(`${hotspot.name} · ${hotspot.severity.toUpperCase()} · M${hotspot.magnitude.toFixed(1)}`, {
-            direction: "top",
-            className: "citypulse-tooltip",
-          })
-          .on("click", openHotspot)
-          .addTo(map);
+      map.addSource("reroute", {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: routeCoords } },
+      });
+      map.addLayer({
+        id: "reroute-glow",
+        type: "line",
+        source: "reroute",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#06b6d4", "line-width": 12, "line-opacity": 0.22, "line-blur": 6 },
+      });
+      map.addLayer({
+        id: "reroute-line",
+        type: "line",
+        source: "reroute",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#06b6d4",
+          "line-width": 4,
+          "line-opacity": 0.98,
+          "line-dasharray": [2, 2],
+        },
       });
 
-      window.setTimeout(() => map.invalidateSize(), 0);
+      const dashSequence: number[][] = [];
+      for (let i = 0; i < 8; i++) {
+        dashSequence.push([2, 2, i * 0.25, 0]);
+      }
+      dashTimer = window.setInterval(() => {
+        dashStep = (dashStep + 1) % 8;
+        const t = dashStep / 8;
+        if (mapRef.current?.getLayer("reroute-line")) {
+          mapRef.current.setPaintProperty("reroute-line", "line-dasharray", [2, 2 + t * 2]);
+        }
+      }, 120);
+
+      // Origin marker
+      const originEl = labeledMarker(
+        '<div style="width:14px;height:14px;border-radius:9999px;background:#06b6d4;border:2px solid #fff;box-shadow:0 0 14px #06b6d4;"></div>',
+        "UNIT-07 · Origin",
+        "#06b6d4",
+      );
+      markersRef.current.push(
+        new maplibregl.Marker({ element: originEl, anchor: "bottom" })
+          .setLngLat(ORIGIN_POINT)
+          .addTo(map),
+      );
+
+      // Destination marker
+      const destEl = labeledMarker(
+        '<div style="width:14px;height:14px;border-radius:9999px;background:#22c55e;border:2px solid #fff;box-shadow:0 0 14px #22c55e;"></div>',
+        "Destination · Safe Zone",
+        "#22c55e",
+      );
+      markersRef.current.push(
+        new maplibregl.Marker({ element: destEl, anchor: "bottom" })
+          .setLngLat(DEST_POINT)
+          .addTo(map),
+      );
+
+      // Blockage marker
+      const blockEl = labeledMarker(
+        '<div style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;color:#f97316;font-size:22px;font-weight:700;text-shadow:0 0 12px #f97316;line-height:1;">✕</div>',
+        "Blockage · Re-route Trigger",
+        "#f97316",
+      );
+      markersRef.current.push(
+        new maplibregl.Marker({ element: blockEl, anchor: "bottom" })
+          .setLngLat(BLOCKAGE_POINT)
+          .addTo(map),
+      );
+
+      // Global hotspots
+      GLOBAL_HOTSPOTS.forEach((h) => {
+        const color = SEVERITY_COLOR[h.severity];
+        const el = document.createElement("div");
+        const size = 10 + h.magnitude * 2;
+        el.style.cssText = `position:relative;width:${size}px;height:${size}px;border-radius:9999px;background:${color};border:1.5px solid #fff;box-shadow:0 0 ${
+          8 + h.magnitude * 2
+        }px ${color};cursor:pointer;`;
+        const halo = document.createElement("div");
+        halo.style.cssText = `position:absolute;inset:-${h.magnitude * 3}px;border-radius:9999px;background:${color};opacity:0.18;animation:citypulse-ping 2.4s ease-out infinite;`;
+        el.appendChild(halo);
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          focusHotspot(h);
+        });
+        markersRef.current.push(
+          new maplibregl.Marker({ element: el })
+            .setLngLat([h.lng, h.lat])
+            .setPopup(
+              new Popup({ closeButton: false, offset: 14 }).setHTML(
+                tip(`${h.name} · ${h.severity.toUpperCase()} · M${h.magnitude.toFixed(1)}`, color),
+              ),
+            )
+            .addTo(map),
+        );
+      });
+
+      void renderAftershocks(map);
+    };
+
+    map.on("load", () => {
+      void wireLayers();
     });
 
     return () => {
       cancelled = true;
-      if (dashTimer) {
-        window.clearInterval(dashTimer);
-      }
-      mapRef.current?.remove();
+      if (dashTimer) window.clearInterval(dashTimer);
+      ro.disconnect();
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+      map.remove();
       mapRef.current = null;
-      tileLayerRef.current = null;
-      rerouteRef.current = null;
-      rerouteGlowRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Aftershock overlay: fetch USGS and render recent events as fading markers
   useEffect(() => {
     let mounted = true;
-    let layer: any = null;
-    let iv: number | null = null;
-    const fetchAndRender = async () => {
-      if (!mapRef.current) return;
-      try {
-        const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson');
-        const j = await res.json();
-        const feats = j.features || [];
-        // proximity filter ~100km from ACTIVE_CENTER
-        const proximityKm = hazardConfig.aftershock.proximityKm;
-        const filtered = feats.filter((f: any) => {
-          const [lng, lat] = f.geometry.coordinates;
-          const R = 6371; // km
-          const dLat = ((lat - ACTIVE_CENTER[1]) * Math.PI) / 180;
-          const dLon = ((lng - ACTIVE_CENTER[0]) * Math.PI) / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos((ACTIVE_CENTER[1] * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const d = R * c;
-          return d <= proximityKm; // within configured km
-        });
+    let interval: number | null = null;
 
-        const L = await import('leaflet');
-        if (!mounted || !mapRef.current) return;
-        if (layer) {
-          layer.clearLayers();
-        } else {
-          layer = L.layerGroup().addTo(mapRef.current!);
-        }
-
-        const now = Date.now();
-        let omoriSum = 0;
-        const cfg = hazardConfig.aftershock;
-        filtered.slice(0, cfg.maxEvents).forEach((f: any) => {
-          const [lng, lat, depth] = f.geometry.coordinates;
-          const mag = f.properties?.mag || 0;
-          const time = f.properties?.time || now;
-          const ageHours = Math.max(0.001, (now - time) / (1000 * 60 * 60));
-          // weight recent and larger magnitudes more
-          const weight = (Math.max(0.5, mag) * (1 / (1 + ageHours)));
-          omoriSum += weight;
-
-          const opacity = Math.max(0.12, Math.min(0.95, 1 / (1 + ageHours / cfg.opacityDecayHalfLifeHours)));
-          const radius = 4 + Math.max(0, mag) * cfg.radiusScale;
-
-          const marker = L.circleMarker([lat, lng], {
-            radius,
-            stroke: false,
-            fillColor: mag >= 4.5 ? '#ef4444' : mag >= 3.0 ? '#f59e0b' : '#06b6d4',
-            fillOpacity: opacity * 0.9,
-          }).bindTooltip(`M${mag} • ${f.properties?.place || ''}`, { direction: 'top', className: 'citypulse-tooltip' });
-
-          marker.addTo(layer);
-        });
-
-        // simple Omori-like predicted next-hour probability
-        const predicted = Math.min(99, Math.round(omoriSum * 8));
-        // show small control with predicted value
-        if (mapRef.current) {
-          const controlId = 'aftershock-predicted';
-          // remove existing control element if present
-          const existing = document.getElementById(controlId);
-          if (existing) existing.remove();
-          const ctrl = document.createElement('div');
-          ctrl.id = controlId;
-          ctrl.className = 'pointer-events-auto absolute left-4 bottom-4 z-50';
-          ctrl.innerHTML = `
-            <div class="p-1.5 rounded-md border bg-slate-950/80 border-slate-800 text-slate-100 text-xs">
-              <div class="text-[9px] uppercase text-slate-300">Aftershock (1h)</div>
-              <div class="mt-0.5 text-xs font-semibold">${predicted}%</div>
-            </div>
-          `;
-          mapRef.current.getContainer().appendChild(ctrl);
-        }
-      } catch (e) {
-        console.warn('aftershock overlay fetch failed', e);
-      }
+    const refresh = async () => {
+      const map = mapRef.current;
+      if (!mounted || !map?.isStyleLoaded()) return;
+      await renderAftershocks(map);
     };
 
-    // initial render and periodic refresh
-    iv = window.setInterval(fetchAndRender, 60_000);
-    fetchAndRender();
+    interval = window.setInterval(refresh, 60_000);
 
     return () => {
       mounted = false;
-      if (iv) window.clearInterval(iv);
-      if (layer) layer.clearLayers();
+      if (interval) window.clearInterval(interval);
     };
   }, []);
 
+  // Theme switch — swap style and re-add custom layers
   useEffect(() => {
     const map = mapRef.current;
-    const tile = tileLayerRef.current;
-    if (!map || !tile) return;
-    void import("leaflet").then((L) => {
-      map.removeLayer(tile);
-      tileLayerRef.current = L.tileLayer(theme === "dark" ? TILE_DARK : TILE_LIGHT, {
-        maxZoom: 19,
-        subdomains: "abcd",
-      }).addTo(map);
-      tileLayerRef.current.bringToBack();
+    if (!map) return;
+    const newStyle = theme === "dark" ? STYLE_DARK : STYLE_LIGHT;
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const pitch = map.getPitch();
+    const bearing = map.getBearing();
+
+    map.setStyle(newStyle);
+    map.once("styledata", () => {
+      map.jumpTo({ center, zoom, pitch, bearing });
+      // Re-add 3D buildings on new style
+      try {
+        if (map.getLayer("3d-buildings")) return;
+        const layers = map.getStyle().layers ?? [];
+        let labelLayerId: string | undefined;
+        for (const l of layers) {
+          if (l.type === "symbol") {
+            labelLayerId = l.id;
+            break;
+          }
+        }
+        if (map.getSource("carto")) {
+          map.addLayer(
+            {
+              id: "3d-buildings",
+              source: "carto",
+              "source-layer": "building",
+              type: "fill-extrusion",
+              minzoom: 14,
+              paint: {
+                "fill-extrusion-color": theme === "dark" ? "#1b2230" : "#cbd5e1",
+                "fill-extrusion-height": [
+                  "case",
+                  ["has", "render_height"],
+                  ["get", "render_height"],
+                  ["has", "height"],
+                  ["get", "height"],
+                  12,
+                ],
+                "fill-extrusion-base": 0,
+                "fill-extrusion-opacity": 0.85,
+              },
+            },
+            labelLayerId,
+          );
+        }
+      } catch {
+        // ignore
+      }
     });
   }, [theme]);
 
   const flyHome = () => focusHotspot(GLOBAL_HOTSPOTS[0]);
   const flyWorld = () => {
-    mapRef.current?.flyTo(WORLD_CENTER, 2, { animate: true, duration: 1.35 });
+    mapRef.current?.flyTo({ center: WORLD_CENTER, zoom: 1.6, pitch: 0, bearing: 0, duration: 1500, essential: true });
   };
 
   const isDark = theme === "dark";
 
   return (
     <div className={`relative h-full w-full overflow-hidden ${isDark ? "bg-[#0d1018]" : "bg-[#e8eef5]"}`}>
-      {/* Background map view layer */}
-      <div ref={containerRef} className="absolute inset-0 z-0" />
-      
-      {/* Dynamic dimming/contrast mapping overlay */}
+      <div ref={containerRef} className="absolute inset-0 z-0" style={{ width: "100%", height: "100%" }} />
+
       {isDark && (
         <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/35 mix-blend-multiply z-10" />
       )}
 
-      {/* HEADER CONTROLS INTERFACE PANEL */}
       <HudOverlay selected={selected} theme={theme} />
-
-      {/* CRITICAL HOTSPOT TRACKER LIST SIDEBAR */}
       <HotspotList selected={selected} theme={theme} onSelect={focusHotspot} />
-
-      {/* BOTTOM-RIGHT HAZARD AI ASSISTANT */}
       <HazardAssistant open={assistantOpen} theme={theme} onOpenChange={setAssistantOpen} />
 
-      {/* HORIZONTAL MODE SECTOR SWITCH CONTROLS */}
-      <div 
+      <div
         className={`pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-500/30 backdrop-blur-md rounded shadow-sm transition-colors duration-200 z-40 ${
           isDark ? "bg-slate-950/70" : "bg-white/90"
         }`}
@@ -466,7 +539,6 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         </button>
       </div>
 
-      {/* RADAR DECORATIVE EMISSION GRID */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.05] z-10">
         <div
           className="absolute left-0 right-0 h-24 animate-scan"
@@ -475,6 +547,122 @@ export function IncidentMap({ theme }: IncidentMapProps) {
       </div>
     </div>
   );
+}
+
+function tip(text: string, color = "#06b6d4") {
+  return `<div style="font-family:ui-monospace,monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#fff;background:rgba(2,6,23,0.92);border:1px solid ${color};padding:6px 10px;border-radius:2px;box-shadow:0 0 14px ${color}66;white-space:nowrap;">${text}</div>`;
+}
+
+function labeledMarker(iconHTML: string, label: string, color: string): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.style.cssText =
+    "display:flex;flex-direction:column;align-items:center;gap:4px;transform:translateY(0);";
+  const icon = document.createElement("div");
+  icon.style.cssText = "display:flex;align-items:center;justify-content:center;";
+  icon.innerHTML = iconHTML;
+  const tag = document.createElement("div");
+  tag.textContent = label;
+  tag.style.cssText = `font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#fff;background:rgba(2,6,23,0.9);border:1px solid ${color};padding:3px 6px;border-radius:2px;box-shadow:0 0 10px ${color}55;white-space:nowrap;`;
+  wrap.appendChild(icon);
+  wrap.appendChild(tag);
+  return wrap;
+}
+
+async function renderAftershocks(map: MlMap) {
+  try {
+    const res = await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson");
+    const json = await res.json();
+    const features = json.features || [];
+    const cfg = hazardConfig.aftershock;
+    const now = Date.now();
+    let omoriSum = 0;
+
+    const filtered = features
+      .filter((feature: any) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        const radiusKm = distanceKm(ACTIVE_CENTER[1], ACTIVE_CENTER[0], lat, lng);
+        return radiusKm <= cfg.proximityKm;
+      })
+      .slice(0, cfg.maxEvents)
+      .map((feature: any) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        const mag = feature.properties?.mag || 0;
+        const time = feature.properties?.time || now;
+        const ageHours = Math.max(0.001, (now - time) / (1000 * 60 * 60));
+        omoriSum += Math.max(0.5, mag) * (1 / (1 + ageHours));
+
+        return {
+          type: "Feature",
+          properties: {
+            mag,
+            place: feature.properties?.place || "",
+            opacity: Math.max(0.12, Math.min(0.95, 1 / (1 + ageHours / cfg.opacityDecayHalfLifeHours))),
+          },
+          geometry: { type: "Point", coordinates: [lng, lat] },
+        };
+      });
+
+    const data = {
+      type: "FeatureCollection",
+      features: filtered,
+    };
+
+    const source = map.getSource("aftershocks") as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      source.setData(data as any);
+    } else {
+      map.addSource("aftershocks", { type: "geojson", data: data as any });
+      map.addLayer({
+        id: "aftershock-circles",
+        type: "circle",
+        source: "aftershocks",
+        paint: {
+          "circle-radius": ["+", 4, ["*", ["coalesce", ["get", "mag"], 0], cfg.radiusScale]],
+          "circle-color": [
+            "case",
+            [">=", ["coalesce", ["get", "mag"], 0], 4.5],
+            "#ef4444",
+            [">=", ["coalesce", ["get", "mag"], 0], 3],
+            "#f59e0b",
+            "#06b6d4",
+          ],
+          "circle-opacity": ["coalesce", ["get", "opacity"], 0.4],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1,
+          "circle-stroke-opacity": 0.65,
+        },
+      });
+    }
+
+    const predicted = Math.min(99, Math.round(omoriSum * 8));
+    const existing = document.getElementById("aftershock-predicted");
+    if (existing) existing.remove();
+
+    const ctrl = document.createElement("div");
+    ctrl.id = "aftershock-predicted";
+    ctrl.className = "pointer-events-auto absolute left-4 bottom-12 z-50";
+    ctrl.innerHTML = `
+      <div class="rounded border border-slate-800 bg-slate-950/80 p-1.5 text-xs text-slate-100">
+        <div class="text-[9px] uppercase text-slate-300">Aftershock (1h)</div>
+        <div class="mt-0.5 text-xs font-semibold">${predicted}%</div>
+      </div>
+    `;
+    map.getContainer().appendChild(ctrl);
+  } catch (error) {
+    console.warn("aftershock overlay fetch failed", error);
+  }
+}
+
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const earthKm = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return earthKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function HazardAssistant({
@@ -666,7 +854,7 @@ function HotspotList({
 }) {
   const isDark = theme === "dark";
   return (
-    <div 
+    <div
       className={`pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-500/30 backdrop-blur-md rounded shadow-md transition-colors duration-200 z-40 ${
         isDark ? "bg-slate-950/80" : "bg-white/90"
       }`}
@@ -719,11 +907,10 @@ function HotspotList({
 
 function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dark" | "light" }) {
   const isDark = theme === "dark";
-  
+
   return (
     <>
-      {/* NAVIGATION INDICATORS METRIC TOP HEADER */}
-      <div 
+      <div
         className={`pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-cyan-500/10 px-5 py-2 backdrop-blur-md transition-colors duration-200 z-40 ${
           isDark ? "bg-slate-950/60 text-slate-300" : "bg-white/80 text-slate-800"
         }`}
@@ -746,19 +933,18 @@ function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dar
         </div>
         <div className={`flex items-center gap-3 text-[10px] uppercase font-medium tracking-[0.22em] ${isDark ? "text-slate-400" : "text-slate-600"}`}>
           <span className="flex items-center gap-1.5">
-            <Layers className="h-3 w-3" /> {theme === "dark" ? "Dark" : "Light"} Layer
+            <Layers className="h-3 w-3" /> {theme === "dark" ? "Dark" : "Light"} 3D
           </span>
           <span className="flex items-center gap-1.5">
             <Compass className="h-3 w-3" /> Live OSRM
           </span>
           <span className="flex items-center gap-1.5">
-            <Maximize2 className="h-3 w-3" /> Global HUD
+            <Maximize2 className="h-3 w-3" /> MapLibre HUD
           </span>
         </div>
       </div>
 
-      {/* MAP STATUS AND LEGEND FOOTER PANEL */}
-      <div 
+      <div
         className={`pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-cyan-500/10 px-5 py-2 backdrop-blur-md transition-colors duration-200 z-40 ${
           isDark ? "bg-slate-950/60 text-slate-400" : "bg-white/80 text-slate-700"
         }`}
@@ -770,7 +956,7 @@ function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dar
           <LegendDot color="#f97316" label="Blockage" isDark={isDark} />
         </div>
         <div className={`text-[10px] uppercase tracking-[0.22em] font-medium ${isDark ? "text-slate-500" : "text-slate-600"}`}>
-          Map Engine: CARTO Framework · Telemetry: OSRM Core
+          Map Engine: MapLibre GL · 3D Buildings · Telemetry: OSRM Core
         </div>
       </div>
     </>

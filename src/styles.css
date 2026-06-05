@@ -83,11 +83,29 @@
 .animate-route { stroke-dasharray: 8 6; animation: route-dash 1.2s linear infinite; }
 .animate-scan { animation: scan 6s linear infinite; }
 
-.leaflet-container {
+.leaflet-container,
+.maplibregl-map {
   height: 100%;
   width: 100%;
   background: #0d1018;
   font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.maplibregl-ctrl-group {
+  border: 1px solid color-mix(in oklab, var(--cyan-route) 28%, transparent) !important;
+  border-radius: 0 !important;
+  overflow: hidden;
+  box-shadow: none !important;
+}
+
+.maplibregl-ctrl-group button,
+.maplibregl-ctrl-attrib {
+  background: color-mix(in oklab, var(--mask) 82%, transparent) !important;
+  color: var(--color-cyan-route) !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: color-mix(in oklab, var(--cyan-route) 10%, var(--mask)) !important;
 }
 
 .leaflet-control-zoom {

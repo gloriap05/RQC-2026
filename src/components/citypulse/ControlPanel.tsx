@@ -1,12 +1,11 @@
-import { AlertTriangle, Radio } from "lucide-react";
+import { AlertTriangle, Radio, Moon, Sun } from "lucide-react";
 
-const features = [
-  "3D Collapse Geofencing (Turf.js Math)",
-  "Passive Civilian Density Heatmap (Network Handshakes)",
-  "Dynamic Topology Rerouting (OpenStreetMap)",
-  "Automated Structural Tilt Flags (Pre/Post LiDAR)",
-  "Focal-Plane Viewport Filter (Active Zone Zoom)",
-];
+type Theme = "dark" | "light";
+
+interface ControlPanelProps {
+  theme: Theme;
+  onThemeChange: (t: Theme) => void;
+}
 
 const districts = [
   { name: "Downtown District", value: 34, tone: "critical" as const },
@@ -20,7 +19,7 @@ const toneClass = {
   safe: "text-safe",
 };
 
-export function ControlPanel() {
+export function ControlPanel({ theme, onThemeChange }: ControlPanelProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -87,24 +86,30 @@ export function ControlPanel() {
         </div>
       </div>
 
-      {/* Toggles */}
+      {/* Map Mode Toggle */}
       <div className="px-5 pt-6">
-        <SectionLabel>Independent Layer Features</SectionLabel>
-        <div className="mt-3 space-y-1.5">
-          {features.map((f, i) => (
-            <label
-              key={f}
-              className="group flex cursor-pointer items-start gap-3 rounded-sm border border-border bg-mask/40 px-3 py-2 transition-colors hover:border-cyan-route/60 hover:bg-mask"
-            >
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-cyan-route bg-cyan-route/15 text-cyan-route">
-                <span className="text-[10px] font-bold leading-none">X</span>
-              </span>
-              <span className="text-[11px] leading-tight tracking-wide text-foreground/90">
-                <span className="text-cyan-route/80">[{String(i + 1).padStart(2, "0")}]</span>{" "}
-                {f}
-              </span>
-            </label>
-          ))}
+        <SectionLabel>Map Display Mode</SectionLabel>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onThemeChange("dark")}
+            className={`flex items-center justify-center gap-2 rounded-sm border px-3 py-2.5 text-[11px] uppercase tracking-[0.18em] transition-colors ${
+              theme === "dark"
+                ? "border-cyan-route bg-cyan-route/15 text-cyan-route"
+                : "border-border bg-mask/40 text-muted-foreground hover:border-cyan-route/40"
+            }`}
+          >
+            <Moon className="h-3.5 w-3.5" /> Dark
+          </button>
+          <button
+            onClick={() => onThemeChange("light")}
+            className={`flex items-center justify-center gap-2 rounded-sm border px-3 py-2.5 text-[11px] uppercase tracking-[0.18em] transition-colors ${
+              theme === "light"
+                ? "border-cyan-route bg-cyan-route/15 text-cyan-route"
+                : "border-border bg-mask/40 text-muted-foreground hover:border-cyan-route/40"
+            }`}
+          >
+            <Sun className="h-3.5 w-3.5" /> Light
+          </button>
         </div>
       </div>
 

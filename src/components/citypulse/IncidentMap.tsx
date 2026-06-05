@@ -61,7 +61,7 @@ const GLOBAL_HOTSPOTS: Hotspot[] = [
 const SEVERITY_COLOR: Record<Hotspot["severity"], string> = {
   critical: "#ef4444",
   warning: "#f59e0b",
-  watch: "#22d3ee",
+  watch: "#06b6d4",
 };
 
 function hotspotZoom(hotspot: Hotspot) {
@@ -151,12 +151,12 @@ export function IncidentMap({ theme }: IncidentMapProps) {
           routeCoords = coords.map((c: [number, number]) => [c[1], c[0]]);
         }
       } catch {
-        // Fallback representation
+        // Fallback trace
       }
       if (cancelled || !mapRef.current) return;
 
       rerouteGlowRef.current = L.polyline(routeCoords, {
-        color: "#67e8f9",
+        color: "#06b6d4",
         weight: 10,
         opacity: 0.22,
         lineCap: "round",
@@ -164,7 +164,7 @@ export function IncidentMap({ theme }: IncidentMapProps) {
       }).addTo(map);
 
       rerouteRef.current = L.polyline(routeCoords, {
-        color: "#67e8f9",
+        color: "#06b6d4",
         weight: 4,
         opacity: 0.98,
         dashArray: "10 10",
@@ -181,7 +181,7 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         radius: 6,
         color: "#ffffff",
         weight: 1.5,
-        fillColor: "#67e8f9",
+        fillColor: "#06b6d4",
         fillOpacity: 1,
       })
         .bindTooltip("UNIT-07 ORIGIN", {
@@ -275,47 +275,50 @@ export function IncidentMap({ theme }: IncidentMapProps) {
 
   return (
     <div className={`relative h-full w-full overflow-hidden ${isDark ? "bg-[#0d1018]" : "bg-[#e8eef5]"}`}>
-      {/* Background layer: Leaflet map container */}
+      {/* Background map view layer */}
       <div ref={containerRef} className="absolute inset-0 z-0" />
       
-      {/* Dimming overlay layer */}
+      {/* Dynamic dimming/contrast mapping overlay */}
       {isDark && (
         <div className="pointer-events-none absolute inset-0 bg-[#0d1018]/35 mix-blend-multiply z-10" />
       )}
 
-      {/* TOP HUD AND BOTTOM BAR PANEL LAYER */}
+      {/* HEADER CONTROLS INTERFACE PANEL */}
       <HudOverlay selected={selected} theme={theme} />
 
-      {/* RIGHT SIDEBAR: GLOBAL CRITICAL INDEX LIST PANEL */}
-      <HotspotList
-        selected={selected}
-        onSelect={(hotspot) => {
-          focusHotspot(hotspot);
-        }}
-      />
+      {/* CRITICAL HOTSPOT TRACKER LIST SIDEBAR */}
+      <HotspotList selected={selected} theme={theme} onSelect={focusHotspot} />
 
-      {/* CENTER SECTOR & WORLD CONFIGURATION TOGGLES CONTAINER */}
-      <div className="pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-route/30 bg-mask/70 backdrop-blur-sm z-40">
+      {/* HORIZONTAL MODE SECTOR SWITCH CONTROLS */}
+      <div 
+        className={`pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-500/30 backdrop-blur-md rounded shadow-sm transition-colors duration-200 z-40 ${
+          isDark ? "bg-slate-950/70" : "bg-white/90"
+        }`}
+      >
         <button
           onClick={flyHome}
-          className="px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] text-cyan-route hover:bg-cyan-route/10"
+          className={`px-3 py-1.5 text-[10px] uppercase font-semibold tracking-[0.25em] transition-colors hover:bg-cyan-500/10 ${
+            isDark ? "text-cyan-400" : "text-cyan-600"
+          }`}
         >
           ◎ Active Sector
         </button>
-        <span className="h-4 w-px bg-cyan-route/30" />
+        <span className="h-4 w-px bg-cyan-500/30" />
         <button
           onClick={flyWorld}
-          className="px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] text-cyan-route hover:bg-cyan-route/10"
+          className={`px-3 py-1.5 text-[10px] uppercase font-semibold tracking-[0.25em] transition-colors hover:bg-cyan-500/10 ${
+            isDark ? "text-cyan-400" : "text-cyan-600"
+          }`}
         >
           ◯ Global View
         </button>
       </div>
 
-      {/* AMBIENT DECORATIVE LAYER */}
+      {/* RADAR DECORATIVE EMISSION GRID */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.05] z-10">
         <div
           className="absolute left-0 right-0 h-24 animate-scan"
-          style={{ background: "linear-gradient(to bottom, transparent, var(--cyan-route), transparent)" }}
+          style={{ background: "linear-gradient(to bottom, transparent, #06b6d4, transparent)" }}
         />
       </div>
     </div>
@@ -324,17 +327,27 @@ export function IncidentMap({ theme }: IncidentMapProps) {
 
 function HotspotList({
   selected,
+  theme,
   onSelect,
 }: {
   selected: Hotspot | null;
+  theme: "dark" | "light";
   onSelect: (h: Hotspot) => void;
 }) {
+  const isDark = theme === "dark";
   return (
-    /* FIXED: Changed to z-40 to pop over the map container and allow direct click events */
-    <div className="pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-route/30 bg-mask/80 backdrop-blur-sm z-40">
-      <div className="flex items-center justify-between border-b border-cyan-route/30 px-3 py-2">
-        <span className="text-[10px] uppercase tracking-[0.25em] text-cyan-route">◢ Global Critical Index</span>
-        <span className="text-[9px] text-muted-foreground">{GLOBAL_HOTSPOTS.length}</span>
+    <div 
+      className={`pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-500/30 backdrop-blur-md rounded shadow-md transition-colors duration-200 z-40 ${
+        isDark ? "bg-slate-950/80" : "bg-white/90"
+      }`}
+    >
+      <div className="flex items-center justify-between border-b border-cyan-500/30 px-3 py-2">
+        <span className={`text-[10px] uppercase font-bold tracking-[0.25em] ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
+          ◢ Global Critical Index
+        </span>
+        <span className={`text-[9px] font-mono ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          {GLOBAL_HOTSPOTS.length} SECTORS
+        </span>
       </div>
       <ul className="max-h-[calc(100vh-220px)] overflow-y-auto">
         {GLOBAL_HOTSPOTS.map((hotspot) => {
@@ -343,8 +356,8 @@ function HotspotList({
             <li key={hotspot.id}>
               <button
                 onClick={() => onSelect(hotspot)}
-                className={`flex w-full items-center gap-2 border-l-2 px-3 py-2 text-left text-[10px] hover:bg-cyan-route/5 ${
-                  active ? "border-cyan-route bg-cyan-route/10" : "border-transparent"
+                className={`flex w-full items-center gap-2 border-l-2 px-3 py-2 text-left text-[10px] transition-colors hover:bg-cyan-500/5 ${
+                  active ? "border-cyan-500 bg-cyan-500/10" : "border-transparent"
                 }`}
               >
                 <span
@@ -355,9 +368,13 @@ function HotspotList({
                   }}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate uppercase tracking-[0.15em] text-foreground">{hotspot.name}</div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <span style={{ color: SEVERITY_COLOR[hotspot.severity] }}>{hotspot.severity.toUpperCase()}</span>
+                  <div className={`truncate uppercase tracking-[0.15em] font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {hotspot.name}
+                  </div>
+                  <div className={`flex items-center gap-2 text-[9px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <span style={{ color: SEVERITY_COLOR[hotspot.severity], fontWeight: 600 }}>
+                      {hotspot.severity.toUpperCase()}
+                    </span>
                     <span>· M{hotspot.magnitude.toFixed(1)}</span>
                   </div>
                 </div>
@@ -371,56 +388,68 @@ function HotspotList({
 }
 
 function HudOverlay({ selected, theme }: { selected: Hotspot | null; theme: "dark" | "light" }) {
+  const isDark = theme === "dark";
+  
   return (
     <>
-      {/* FIXED: Changed to z-40 to push top dashboard indicators on top of map element */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm z-40">
-        <div className="flex items-center gap-4 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          <span className="pointer-events-auto flex items-center gap-2 text-cyan-route">
+      {/* NAVIGATION INDICATORS METRIC TOP HEADER */}
+      <div 
+        className={`pointer-events-none absolute left-0 right-0 top-0 flex items-center justify-between border-b border-cyan-500/10 px-5 py-2 backdrop-blur-md transition-colors duration-200 z-40 ${
+          isDark ? "bg-slate-950/60 text-slate-300" : "bg-white/80 text-slate-800"
+        }`}
+      >
+        <div className="flex items-center gap-4 text-[10px] uppercase font-medium tracking-[0.22em]">
+          <span className={`pointer-events-auto flex items-center gap-2 font-bold ${isDark ? "text-cyan-400" : "text-cyan-600"}`}>
             <Crosshair className="h-3 w-3" />
             {selected ? selected.name : "Active Zone"}
           </span>
           {selected && (
             <>
-              <span>Lat {selected.lat.toFixed(4)}° · Lon {selected.lng.toFixed(4)}°</span>
-              <span style={{ color: SEVERITY_COLOR[selected.severity] }}>
+              <span className={isDark ? "text-slate-300" : "text-slate-700"}>
+                Lat {selected.lat.toFixed(4)}° · Lon {selected.lng.toFixed(4)}°
+              </span>
+              <span style={{ color: SEVERITY_COLOR[selected.severity], fontWeight: 600 }}>
                 M{selected.magnitude.toFixed(1)} · {selected.severity.toUpperCase()}
               </span>
             </>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        <div className={`flex items-center gap-3 text-[10px] uppercase font-medium tracking-[0.22em] ${isDark ? "text-slate-400" : "text-slate-600"}`}>
           <span className="flex items-center gap-1.5">
-            <Layers className="h-3 w-3" /> {theme === "dark" ? "Dark" : "Light"} Tiles
+            <Layers className="h-3 w-3" /> {theme === "dark" ? "Dark" : "Light"} Layer
           </span>
           <span className="flex items-center gap-1.5">
-            <Compass className="h-3 w-3" /> OSRM Routed
+            <Compass className="h-3 w-3" /> Live OSRM
           </span>
           <span className="flex items-center gap-1.5">
-            <Maximize2 className="h-3 w-3" /> Worldwide
+            <Maximize2 className="h-3 w-3" /> Global HUD
           </span>
         </div>
       </div>
 
-      {/* FIXED: Changed to z-40 to stack the bottom control menu correctly */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-border/60 bg-mask/50 px-5 py-2 backdrop-blur-sm z-40">
+      {/* MAP STATUS AND LEGEND FOOTER PANEL */}
+      <div 
+        className={`pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between border-t border-cyan-500/10 px-5 py-2 backdrop-blur-md transition-colors duration-200 z-40 ${
+          isDark ? "bg-slate-950/60 text-slate-400" : "bg-white/80 text-slate-700"
+        }`}
+      >
         <div className="flex items-center gap-5 text-[10px] uppercase tracking-[0.22em]">
-          <LegendDot color="#ef4444" label="Critical" />
-          <LegendDot color="#f59e0b" label="Warning" />
-          <LegendDot color="#22d3ee" label="Reroute / Watch" />
-          <LegendDot color="#f97316" label="Blockage" />
+          <LegendDot color="#ef4444" label="Critical" isDark={isDark} />
+          <LegendDot color="#f59e0b" label="Warning" isDark={isDark} />
+          <LegendDot color="#06b6d4" label="Watch" isDark={isDark} />
+          <LegendDot color="#f97316" label="Blockage" isDark={isDark} />
         </div>
-        <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-          Tiles: CARTO {theme === "dark" ? "Dark" : "Positron"} · Route: OSRM
+        <div className={`text-[10px] uppercase tracking-[0.22em] font-medium ${isDark ? "text-slate-500" : "text-slate-600"}`}>
+          Map Engine: CARTO Framework · Telemetry: OSRM Core
         </div>
       </div>
     </>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function LegendDot({ color, label, isDark }: { color: string; label: string; isDark: boolean }) {
   return (
-    <span className="flex items-center gap-2 text-muted-foreground">
+    <span className={`flex items-center gap-2 font-medium ${isDark ? "text-slate-300" : "text-slate-800"}`}>
       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
       {label}
     </span>

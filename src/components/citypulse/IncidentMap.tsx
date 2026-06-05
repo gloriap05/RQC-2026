@@ -1,4 +1,4 @@
-import { Crosshair, Maximize2, Layers, Compass } from "lucide-react";
+import { AlertTriangle, Ambulance, BrainCircuit, Check, Compass, Crosshair, Flame, Layers, Maximize2, Send, ShieldAlert, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { LatLngExpression, Map as LeafletMap, TileLayer as LeafletTileLayer, Polyline as LeafletPolyline } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -64,6 +64,40 @@ const SEVERITY_COLOR: Record<Hotspot["severity"], string> = {
   watch: "#06b6d4",
 };
 
+const AI_ACTIONS = [
+  {
+    action: "Move ambulatory civilians east of the geofence for triage.",
+    priority: "P1",
+    risk: "High",
+    reason: "Highest lives-saved impact with lower responder exposure.",
+  },
+  {
+    action: "Dispatch Fire HazMat to isolate gas and power before deep entry.",
+    priority: "P2",
+    risk: "Critical",
+    reason: "Reduces ignition and electrocution risk for rescue teams.",
+  },
+  {
+    action: "Set a 150 m exclusion perimeter around the collapse zone.",
+    priority: "P3",
+    risk: "High",
+    reason: "Prevents secondary casualties while specialists move in.",
+  },
+  {
+    action: "Route EMS Unit-07 through the cyan path and stage at Mission / 6th.",
+    priority: "P4",
+    risk: "Medium",
+    reason: "Avoids the blocked approach and keeps extraction moving.",
+  },
+];
+
+const RESPONSE_TEAMS = [
+  { icon: ShieldAlert, label: "Entry Lead", value: "Urban Search & Rescue Alpha", tone: "text-critical" },
+  { icon: Ambulance, label: "Medical", value: "EMS Unit-07 + triage lead", tone: "text-safe" },
+  { icon: Flame, label: "Utility Risk", value: "Fire HazMat + gas shutoff", tone: "text-warning" },
+  { icon: Users, label: "Control", value: "Police perimeter crew", tone: "text-cyan-route" },
+];
+
 function hotspotZoom(hotspot: Hotspot) {
   if (hotspot.id === "sf") return 15;
   if (hotspot.severity === "critical") return 8;
@@ -82,6 +116,7 @@ export function IncidentMap({ theme }: IncidentMapProps) {
   const rerouteRef = useRef<LeafletPolyline | null>(null);
   const rerouteGlowRef = useRef<LeafletPolyline | null>(null);
   const [selected, setSelected] = useState<Hotspot | null>(GLOBAL_HOTSPOTS[0]);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const focusHotspot = (hotspot: Hotspot) => {
     setSelected(hotspot);
@@ -128,6 +163,27 @@ export function IncidentMap({ theme }: IncidentMapProps) {
         fillColor: "#ef4444",
         fillOpacity: 0.08,
       }).addTo(map);
+
+      L.marker(DEST_POINT, {
+        zIndexOffset: 800,
+        icon: L.divIcon({
+          className: "citypulse-div-icon",
+          iconSize: [42, 42],
+          iconAnchor: [21, 39],
+          html: `
+            <div class="citypulse-hazard-marker" aria-label="Critical hazard">
+              <div class="citypulse-hazard-triangle">!</div>
+            </div>
+          `,
+        }),
+      })
+        .bindTooltip("HAZARD: COLLAPSE + UTILITY LEAK RISK", {
+          permanent: true,
+          direction: "top",
+          offset: [0, -34],
+          className: "citypulse-tooltip citypulse-tooltip--hazard",
+        })
+        .addTo(map);
 
       CIVILIAN_HEAT.forEach((point) => {
         L.circleMarker([point.lat, point.lng], {
@@ -289,6 +345,9 @@ export function IncidentMap({ theme }: IncidentMapProps) {
       {/* CRITICAL HOTSPOT TRACKER LIST SIDEBAR */}
       <HotspotList selected={selected} theme={theme} onSelect={focusHotspot} />
 
+      {/* BOTTOM-RIGHT HAZARD AI ASSISTANT */}
+      <HazardAssistant open={assistantOpen} theme={theme} onOpenChange={setAssistantOpen} />
+
       {/* HORIZONTAL MODE SECTOR SWITCH CONTROLS */}
       <div 
         className={`pointer-events-auto absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-1 border border-cyan-500/30 backdrop-blur-md rounded shadow-sm transition-colors duration-200 z-40 ${
@@ -321,6 +380,184 @@ export function IncidentMap({ theme }: IncidentMapProps) {
           style={{ background: "linear-gradient(to bottom, transparent, #06b6d4, transparent)" }}
         />
       </div>
+    </div>
+  );
+}
+
+function HazardAssistant({
+  open,
+  theme,
+  onOpenChange,
+}: {
+  open: boolean;
+  theme: "dark" | "light";
+  onOpenChange: (open: boolean) => void;
+}) {
+  const isDark = theme === "dark";
+  const [completedActions, setCompletedActions] = useState<string[]>([]);
+  const [reply, setReply] = useState("");
+
+  const toggleAction = (action: string) => {
+    setCompletedActions((current) =>
+      current.includes(action) ? current.filter((item) => item !== action) : [...current, action],
+    );
+  };
+
+  return (
+    <div className="pointer-events-auto absolute bottom-12 right-5 z-50 flex max-w-[calc(100%-1.25rem)] flex-col items-end gap-3">
+      {open && (
+        <div
+          className={`flex max-h-[calc(100vh-150px)] w-[330px] flex-col overflow-hidden rounded border border-warning/60 shadow-2xl backdrop-blur-md transition-colors duration-200 ${
+            isDark ? "bg-slate-950/92 text-slate-100" : "bg-white/95 text-slate-900"
+          }`}
+        >
+          <div className="flex items-start gap-2.5 border-b border-warning/30 px-3 py-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-warning bg-warning/15 text-warning">
+              <BrainCircuit className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] uppercase tracking-[0.25em] text-warning">
+                Hazard AI Assistant
+              </div>
+              <div className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-warning">
+                Collapse + utility leak risk
+              </div>
+              <div className={`mt-0.5 text-[9px] leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                AI triage chat for Sector 4 responders.
+              </div>
+            </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center border transition-colors ${
+                isDark
+                  ? "border-slate-700 text-slate-400 hover:border-warning/60 hover:text-warning"
+                  : "border-slate-300 text-slate-500 hover:border-warning hover:text-warning"
+              }`}
+              aria-label="Close hazard assistant"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
+            <div className="space-y-2.5">
+            <div className="flex items-start gap-2">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
+                <BrainCircuit className="h-3.5 w-3.5" />
+              </div>
+              <div className={`max-w-[252px] border px-2.5 py-2 text-[10px] leading-relaxed ${
+                isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-slate-50"
+              }`}>
+                <div className="font-bold uppercase tracking-[0.12em] text-warning">
+                  Collapse + utility leak risk detected.
+                </div>
+                <div className={`mt-1 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  I am seeing structural damage, geofence danger, blocked approach, and possible gas/electrical exposure.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
+                <BrainCircuit className="h-3.5 w-3.5" />
+              </div>
+              <div className={`max-w-[270px] border px-2.5 py-2 ${
+                isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-slate-50"
+              }`}>
+                <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  Suggested Actions
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {AI_ACTIONS.map((item, index) => (
+                    <button
+                      key={item.action}
+                      onClick={() => toggleAction(item.action)}
+                      className={`flex w-full items-start gap-2 border px-2 py-1.5 text-left text-[10px] leading-relaxed transition-colors ${
+                        completedActions.includes(item.action)
+                          ? "border-green-300 bg-green-100/90 text-green-900"
+                          : isDark
+                            ? "border-slate-700 bg-slate-950/60 hover:border-warning/60"
+                            : "border-slate-300 bg-white hover:border-warning"
+                      }`}
+                    >
+                      <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border ${
+                        completedActions.includes(item.action) ? "border-green-500 bg-green-200 text-green-900" : "border-warning text-warning"
+                      }`}>
+                        {completedActions.includes(item.action) ? <Check className="h-3 w-3" /> : String(index + 1)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block">{item.action}</span>
+                        <span className={`mt-1 flex flex-wrap gap-1.5 text-[8px] uppercase tracking-[0.16em] ${
+                          completedActions.includes(item.action) ? "text-green-800" : "text-muted-foreground"
+                        }`}>
+                          <span>{item.priority}</span>
+                          <span>Risk: {item.risk}</span>
+                        </span>
+                        <span className={`mt-0.5 block text-[9px] leading-snug ${
+                          completedActions.includes(item.action) ? "text-green-800/80" : isDark ? "text-slate-400" : "text-slate-600"
+                        }`}>
+                          {item.reason}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          <div className="mt-2.5 border-t border-warning/25 pt-2.5">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              Who Should Go
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {RESPONSE_TEAMS.map((team) => {
+                const Icon = team.icon;
+                return (
+                  <div key={team.label} className={`border px-2.5 py-2 ${isDark ? "border-slate-800 bg-slate-900/55" : "border-slate-200 bg-slate-50"}`}>
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-3.5 w-3.5 ${team.tone}`} />
+                      <span className="text-[8px] uppercase tracking-[0.2em] text-muted-foreground">{team.label}</span>
+                    </div>
+                    <div className={`mt-1 text-[10px] font-semibold uppercase leading-snug ${team.tone}`}>
+                      {team.value}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-warning/25 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <input
+                value={reply}
+                onChange={(event) => setReply(event.target.value)}
+                placeholder="Ask the AI a follow-up..."
+                className={`min-w-0 flex-1 border px-3 py-2 text-[10px] outline-none transition-colors placeholder:text-muted-foreground focus:border-warning ${
+                  isDark ? "border-slate-700 bg-slate-950/70 text-slate-100" : "border-slate-300 bg-white text-slate-900"
+                }`}
+              />
+              <button
+                className="flex h-9 w-9 shrink-0 items-center justify-center border border-warning bg-warning text-slate-950 transition-colors hover:bg-warning/85"
+                aria-label="Send responder question"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={() => onOpenChange(!open)}
+        className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-950 bg-yellow-400 text-slate-950 shadow-[0_0_28px_color-mix(in_oklab,var(--warning)_75%,transparent)] transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-warning/60"
+        aria-label={open ? "Close hazard assistant" : "Open hazard assistant"}
+      >
+        <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-300/45 animate-ping" />
+        <AlertTriangle className="relative h-7 w-7" />
+      </button>
     </div>
   );
 }

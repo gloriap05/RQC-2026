@@ -57,16 +57,16 @@ function Index() {
     return sorted[0].time || Date.now() - 1000 * 60 * 20;
   })();
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground flex-col">
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="w-[450px] shrink-0 border-r border-border bg-panel overflow-auto">
+    <div className="flex h-screen w-screen min-w-0 flex-col bg-background text-foreground">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <aside className="w-[470px] shrink-0 border-r border-border bg-panel">
           <ControlPanel theme={theme} onThemeChange={setTheme} eventTimestamp={eventTimestamp} />
         </aside>
-        <main className="relative flex-1 overflow-auto">
+        <main className="relative min-w-0 flex-1 overflow-hidden">
           <IncidentMap theme={theme} />
         </main>
       </div>
-      <div className="w-full">
+      <div className="h-[112px] shrink-0 overflow-hidden">
         <ThreatTimeline
           hazards={timelineHazards}
           weather={{ windSpeed: 15, precipitation: 2 }}

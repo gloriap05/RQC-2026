@@ -21,7 +21,7 @@ export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPa
 
   function CompactCard({ children }: { children: React.ReactNode }) {
     return (
-      <div className="p-2 rounded-md border bg-slate-950/50 border-slate-800 text-slate-100 text-sm">
+      <div className="rounded border border-slate-800 bg-slate-950/50 p-1.5 text-sm text-slate-100">
         {children}
       </div>
     );
@@ -33,22 +33,22 @@ export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPa
   ];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="border-b border-border px-4 py-3">
+      <div className="shrink-0 border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 text-[10px] tracking-[0.2em] text-muted-foreground">
           <Radio className="h-3 w-3" />
           <span>SYSTEM ID // CP-04-EQ</span>
         </div>
-        <div className="mt-2 flex items-center justify-between">
-          <h1 className="text-[15px] font-semibold uppercase leading-tight tracking-[0.14em]">
+        <div className="mt-1.5 flex items-center justify-between gap-3">
+          <h1 className="text-[14px] font-semibold uppercase leading-tight tracking-[0.12em]">
             CityPulse <span className="text-muted-foreground">//</span> Post-Earthquake Command
           </h1>
-          <div className="ml-4">
+          <div className="shrink-0">
             <GoldenHourClock compact eventTimestamp={eventTimestamp ?? Date.now() - 1000 * 60 * 20} />
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <span className="relative inline-flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full rounded-full bg-safe animate-pulse-dot" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-safe" />
@@ -79,9 +79,9 @@ export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPa
       </div>
 
       {/* Critical Alert */}
-      <div className="px-4 pt-4">
+      <div className="shrink-0 px-4 pt-3">
         <div
-          className="relative overflow-hidden rounded-sm border border-critical bg-critical/10 px-4 py-3 animate-critical"
+          className="relative overflow-hidden rounded-sm border border-critical bg-critical/10 px-3 py-2.5 animate-critical"
         >
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-critical" />
@@ -99,7 +99,7 @@ export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPa
       </div>
 
       {/* New Hazard Panels (compact) */}
-      <div className="px-4 pt-5 space-y-3 overflow-y-auto">
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_auto_auto_1fr] gap-2 px-4 py-3">
         <CompactCard>
           <EscalationPanel timeline={[{ id: 't1', probability: 100, timeOffset: 'T-0' }, { id: 't2', probability: 95, timeOffset: '+12m' }, { id: 't3', probability: 92, timeOffset: '+25m' }]} />
         </CompactCard>
@@ -138,7 +138,7 @@ export function ControlPanel({ theme, onThemeChange, eventTimestamp }: ControlPa
       {/* Map Mode Toggle removed (compact controls moved to header) */}
 
       {/* Footer telemetry */}
-      <div className="mt-auto border-t border-border px-5 py-3">
+      <div className="shrink-0 border-t border-border px-5 py-2">
         <div className="grid grid-cols-3 gap-2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
           <Telemetry label="UPLINK" value="OK" tone="safe" />
           <Telemetry label="LATENCY" value="42ms" tone="safe" />

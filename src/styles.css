@@ -98,10 +98,24 @@
   box-shadow: none !important;
 }
 
+.maplibregl-ctrl-top-right {
+  top: 52px !important;
+  right: 12px !important;
+}
+
 .maplibregl-ctrl-group button,
 .maplibregl-ctrl-attrib {
   background: color-mix(in oklab, var(--mask) 82%, transparent) !important;
   color: var(--color-cyan-route) !important;
+}
+
+.maplibregl-ctrl-group button {
+  height: 30px !important;
+  width: 30px !important;
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon {
+  background-size: 18px 18px !important;
 }
 
 .maplibregl-ctrl-group button:hover {

@@ -56,20 +56,20 @@ export default function ThreatTimeline({
   });
 
   return (
-    <div className="w-full p-3 rounded-t-lg border-t bg-slate-900/60 border-slate-800">
+    <div className="h-full w-full rounded-t border-t border-slate-800 bg-slate-900/60 px-3 py-2">
       <div className="flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Threat Propagation Timeline</div>
         <div className="text-[11px] text-slate-400">Projections: 1h / 6h / 24h • Wind {windSpeed} km/h • Precip {precipitation} mm</div>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <div className="flex gap-2 w-max" style={{ maxWidth: '100%' }}>
+      <div className="mt-2 overflow-x-auto overflow-y-hidden">
+        <div className="flex w-max gap-3" style={{ maxWidth: '100%' }}>
           {projections.slice(0, 6).map((p) => (
-            <div key={p.title} className="p-2 rounded border bg-slate-950/40 border-slate-800 w-48 flex-shrink-0">
+            <div key={p.title} className="w-64 flex-shrink-0 rounded border border-slate-800 bg-slate-950/40 px-2.5 py-1.5">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] font-semibold truncate max-w-[70%]">{p.title}</div>
+                <div className="max-w-[74%] truncate text-[10px] font-semibold">{p.title}</div>
                 <div className="text-[10px] text-slate-300">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2 items-center">
+              <div className="mt-1.5 grid grid-cols-3 items-center gap-2">
                 {[
                   { label: '1h', value: p.p1 },
                   { label: '6h', value: p.p6 },
@@ -79,10 +79,10 @@ export default function ThreatTimeline({
                   const color = val >= 75 ? 'bg-rose-500' : val >= 50 ? 'bg-amber-400' : 'bg-emerald-400';
                   return (
                     <div key={b.label} className="flex flex-col items-start w-full">
-                      <div className="text-[9px] text-slate-400 mb-1">{b.label}</div>
-                      <div className="relative w-full h-3 bg-slate-800 rounded overflow-hidden">
+                      <div className="mb-0.5 text-[8px] text-slate-400">{b.label}</div>
+                      <div className="relative h-2.5 w-full overflow-hidden rounded bg-slate-800">
                         <div className={`${color} h-full`} style={{ width: `${val}%` }} />
-                        <div className="absolute right-1 top-0 text-[9px] text-white/90 font-medium leading-3">{val}%</div>
+                        <div className="absolute right-1 top-0 text-[8px] font-medium leading-[10px] text-white/90">{val}%</div>
                       </div>
                     </div>
                   );

@@ -60,20 +60,20 @@ export default function AftershockPanel({ center }: { center?: { lat: number; ln
   })();
 
   return (
-    <div className="p-3 rounded-lg border bg-slate-950/60 border-slate-800">
+    <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">USGS Aftershocks</div>
-          <div className="mt-1 text-lg font-bold">{features.length} events</div>
+          <div className="mt-0.5 text-base font-bold">{features.length} events</div>
         </div>
         <div className="text-xs font-mono bg-slate-800 px-1 py-0.5 rounded">1h {Math.round(predictedNextHour)}%</div>
       </div>
-      <div className="mt-2 text-[11px] text-slate-400">Feed: earthquake.usgs.gov — proximity filtered {center ? 'to incident' : ''}.</div>
-      <div className="mt-3">
-        <div className="text-[11px] text-slate-500 italic">Top recent:</div>
-        <ul className="mt-2 space-y-1 max-h-28 overflow-auto">
-          {features.slice(0, 6).map((f) => (
-            <li key={f.id} className="text-[12px] text-slate-300">M{Math.round((f.properties.mag || 0) * 10) / 10} • {f.properties.place}</li>
+      <div className="mt-1.5 text-[10px] text-slate-400">Feed: earthquake.usgs.gov — proximity filtered {center ? 'to incident' : ''}.</div>
+      <div className="mt-1.5">
+        <div className="text-[10px] text-slate-500 italic">Top recent:</div>
+        <ul className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 overflow-hidden">
+          {features.slice(0, 4).map((f) => (
+            <li key={f.id} className="truncate text-[10px] text-slate-300">M{Math.round((f.properties.mag || 0) * 10) / 10} • {f.properties.place}</li>
           ))}
         </ul>
       </div>

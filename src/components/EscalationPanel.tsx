@@ -18,16 +18,16 @@ export default function EscalationPanel({ timeline }: { timeline: Array<{ id: st
   const reasoning = `Recent: ${recentStr}% — trend ${trend.toFixed(1)}`;
 
   return (
-    <div className="p-3 rounded-lg border bg-slate-950/60 border-slate-800">
+    <div className="rounded border border-slate-800 bg-slate-950/60 p-2">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Escalation Classifier</div>
-          <div className="mt-1 text-lg font-bold">{label}</div>
+          <div className="mt-0.5 text-base font-bold">{label}</div>
         </div>
         <div className="text-xs font-mono bg-slate-800 px-1 py-0.5 rounded">{Math.round(confidence)}%</div>
       </div>
-      <div className="mt-2 text-xs text-slate-400">{reasoning}</div>
-      <div className="mt-3 text-[11px] text-slate-500 italic">Reasoning trace available on request.</div>
+      <div className="mt-1.5 text-[11px] text-slate-400">{reasoning}</div>
+      <div className="mt-1 text-[10px] text-slate-500 italic">Reasoning trace available on request.</div>
     </div>
   );
 }

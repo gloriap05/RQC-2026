@@ -685,22 +685,22 @@ function HazardAssistant({
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-12 right-5 z-50 flex max-w-[calc(100%-1.25rem)] flex-col items-end gap-3">
+    <div className="pointer-events-none absolute inset-0 z-50">
       {open && (
         <div
-          className={`flex max-h-[calc(100vh-150px)] w-[330px] flex-col overflow-hidden rounded border border-warning/60 shadow-2xl backdrop-blur-md transition-colors duration-200 ${
+          className={`pointer-events-auto absolute bottom-16 right-[19rem] flex max-h-[calc(100%-6rem)] w-[360px] flex-col overflow-hidden rounded border border-warning/60 shadow-2xl backdrop-blur-md transition-colors duration-200 ${
             isDark ? "bg-slate-950/92 text-slate-100" : "bg-white/95 text-slate-900"
           }`}
         >
-          <div className="flex items-start gap-2.5 border-b border-warning/30 px-3 py-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-warning bg-warning/15 text-warning">
+          <div className="flex items-start gap-2 border-b border-warning/30 px-2.5 py-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-warning bg-warning/15 text-warning">
               <BrainCircuit className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[9px] uppercase tracking-[0.25em] text-warning">
                 Hazard AI Assistant
               </div>
-              <div className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-warning">
+              <div className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-warning">
                 Collapse + utility leak risk
               </div>
               <div className={`mt-0.5 text-[9px] leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
@@ -720,13 +720,13 @@ function HazardAssistant({
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
-            <div className="space-y-2.5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2">
+            <div className="space-y-2">
               <div className="flex items-start gap-2">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
                   <BrainCircuit className="h-3.5 w-3.5" />
                 </div>
-                <div className={`max-w-[252px] border px-2.5 py-2 text-[10px] leading-relaxed ${
+                <div className={`max-w-[290px] border px-2.5 py-1.5 text-[9px] leading-relaxed ${
                   isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-slate-50"
                 }`}>
                   <div className="font-bold uppercase tracking-[0.12em] text-warning">
@@ -739,10 +739,10 @@ function HazardAssistant({
               </div>
 
               <div className="flex items-start gap-2">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center border border-warning/60 bg-warning/15 text-warning">
                   <BrainCircuit className="h-3.5 w-3.5" />
                 </div>
-                <div className={`max-w-[270px] border px-2.5 py-2 ${
+                <div className={`max-w-[308px] border px-2.5 py-1.5 ${
                   isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-slate-50"
                 }`}>
                   <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
@@ -753,7 +753,7 @@ function HazardAssistant({
                       <button
                         key={item.action}
                         onClick={() => toggleAction(item.action)}
-                        className={`flex w-full items-start gap-2 border px-2 py-1.5 text-left text-[10px] leading-relaxed transition-colors ${
+                      className={`flex w-full items-start gap-2 border px-2 py-1.5 text-left text-[9px] leading-relaxed transition-colors ${
                           completedActions.includes(item.action)
                             ? "border-green-300 bg-green-100/90 text-green-900"
                             : isDark
@@ -768,13 +768,13 @@ function HazardAssistant({
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block">{item.action}</span>
-                          <span className={`mt-1 flex flex-wrap gap-1.5 text-[8px] uppercase tracking-[0.16em] ${
+                          <span className={`mt-0.5 flex flex-wrap gap-1.5 text-[8px] uppercase tracking-[0.16em] ${
                             completedActions.includes(item.action) ? "text-green-800" : "text-muted-foreground"
                           }`}>
                             <span>{item.priority}</span>
                             <span>Risk: {item.risk}</span>
                           </span>
-                          <span className={`mt-0.5 block text-[9px] leading-snug ${
+                          <span className={`mt-0.5 block text-[8px] leading-snug ${
                             completedActions.includes(item.action) ? "text-green-800/80" : isDark ? "text-slate-400" : "text-slate-600"
                           }`}>
                             {item.reason}
@@ -790,7 +790,7 @@ function HazardAssistant({
                 <div className="text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                   Who Should Go
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-1 gap-1.5">
                   {RESPONSE_TEAMS.map((team) => {
                     const Icon = team.icon;
                     return (
@@ -810,13 +810,13 @@ function HazardAssistant({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-warning/25 px-3 py-2.5">
+          <div className="shrink-0 border-t border-warning/25 px-2.5 py-2">
             <div className="flex items-center gap-2">
               <input
                 value={reply}
                 onChange={(event) => setReply(event.target.value)}
                 placeholder="Ask the AI a follow-up..."
-                className={`min-w-0 flex-1 border px-3 py-2 text-[10px] outline-none transition-colors placeholder:text-muted-foreground focus:border-warning ${
+                className={`min-w-0 flex-1 border px-2.5 py-2 text-[9px] outline-none transition-colors placeholder:text-muted-foreground focus:border-warning ${
                   isDark ? "border-slate-700 bg-slate-950/70 text-slate-100" : "border-slate-300 bg-white text-slate-900"
                 }`}
               />
@@ -833,7 +833,7 @@ function HazardAssistant({
 
       <button
         onClick={() => onOpenChange(!open)}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-950 bg-yellow-400 text-slate-950 shadow-[0_0_28px_color-mix(in_oklab,var(--warning)_75%,transparent)] transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-warning/60"
+        className="pointer-events-auto absolute bottom-16 right-5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-950 bg-yellow-400 text-slate-950 shadow-[0_0_28px_color-mix(in_oklab,var(--warning)_75%,transparent)] transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-warning/60"
         aria-label={open ? "Close hazard assistant" : "Open hazard assistant"}
       >
         <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-300/45 animate-ping" />
@@ -855,7 +855,7 @@ function HotspotList({
   const isDark = theme === "dark";
   return (
     <div
-      className={`pointer-events-auto absolute right-5 top-28 w-64 border border-cyan-500/30 backdrop-blur-md rounded shadow-md transition-colors duration-200 z-40 ${
+      className={`pointer-events-auto absolute right-4 top-24 max-h-[calc(100%-13rem)] w-72 overflow-hidden border border-cyan-500/30 backdrop-blur-md rounded shadow-md transition-colors duration-200 z-40 ${
         isDark ? "bg-slate-950/80" : "bg-white/90"
       }`}
     >
@@ -867,14 +867,14 @@ function HotspotList({
           {GLOBAL_HOTSPOTS.length} SECTORS
         </span>
       </div>
-      <ul className="max-h-[calc(100vh-220px)] overflow-y-auto">
+      <ul className="max-h-[calc(100%-38px)] overflow-y-auto">
         {GLOBAL_HOTSPOTS.map((hotspot) => {
           const active = selected?.id === hotspot.id;
           return (
             <li key={hotspot.id}>
               <button
                 onClick={() => onSelect(hotspot)}
-                className={`flex w-full items-center gap-2 border-l-2 px-3 py-2 text-left text-[10px] transition-colors hover:bg-cyan-500/5 ${
+                className={`flex w-full items-center gap-2 border-l-2 px-3 py-1.5 text-left text-[9px] transition-colors hover:bg-cyan-500/5 ${
                   active ? "border-cyan-500 bg-cyan-500/10" : "border-transparent"
                 }`}
               >
@@ -889,7 +889,7 @@ function HotspotList({
                   <div className={`truncate uppercase tracking-[0.15em] font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
                     {hotspot.name}
                   </div>
-                  <div className={`flex items-center gap-2 text-[9px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  <div className={`flex items-center gap-2 text-[8px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     <span style={{ color: SEVERITY_COLOR[hotspot.severity], fontWeight: 600 }}>
                       {hotspot.severity.toUpperCase()}
                     </span>
